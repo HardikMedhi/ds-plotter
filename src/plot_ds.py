@@ -28,7 +28,7 @@ def visualizeData(source_name, mjd, reshaped_data, time_samples, freq_channels, 
     
     # Create figure with subplots
     # Colorbar on left, main spectrum in middle, frequency series on right
-    fig = plt.figure(figsize=(13, 10))
+    fig = plt.figure(figsize=(16, 10))
     gs = fig.add_gridspec(2, 3, height_ratios=[3, 1], width_ratios=[0.15, 3, 1],
                           hspace=0.05, wspace=0.25)
     
@@ -78,8 +78,9 @@ def visualizeData(source_name, mjd, reshaped_data, time_samples, freq_channels, 
     ax_freq.grid(True, alpha=0.3)
 
     if save_folder is not None:
-        os.makedirs(save_folder, exist_ok=True)
-        fig.savefig(f"{save_folder}/{source_name}_{mjd}_dyn_spec.jpeg", bbox_inches='tight', dpi=150)
+        folder_path = '/'.join([save_folder, source_name])
+        os.makedirs(folder_path, exist_ok=True)
+        fig.savefig(f"{folder_path}/{source_name}_{mjd}_dyn_spec.jpeg", bbox_inches='tight', dpi=150)
         plt.close(fig)
         return None
     
@@ -99,7 +100,6 @@ def main():
         epilog="""
 Example:
   python plot_ds.py /path/to/data.fil
-  python plot_ds.py /path/to/data.fil --source "PSR B1133+16"
   python plot_ds.py /path/to/data.fil --save output_plots/
         """
     )
