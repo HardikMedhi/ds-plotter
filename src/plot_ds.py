@@ -7,6 +7,7 @@ import os
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
 from astropy.time import Time, TimezoneInfo
 import astropy.units as u
 import your
@@ -92,6 +93,80 @@ def mjdToDateTime(mjd):
     return t.to_datetime(timezone=TimezoneInfo(utc_offset=5.5*u.hour))
 
 
+def plot_filterbank(filterbank_path, save_folder=None, p1=5, p2=95, source_name=None):
+    """Read a filterbank file and produce (or save) the dynamic spectrum plot.
+
+    Parameters:
+    - filterbank_path: str - path to the .fil file
+    - save_folder: str or None - if provided, save the plot to this folder
+    - p1, p2: percentiles for color scaling
+    - source_name: optional override for the source name used in the plot title
+
+    Returns:
+    - If `save_folder` is None: returns (fig, ax_main)
+    - If `save_folder` is provided: returns the output filepath string
+    """
+    if not os.path.exists(filterbank_path):
+        raise FileNotFoundError(f"Filterbank file not found: {filterbank_path}")
+
+    print(f"Reading filterbank file: {filterbank_path}")
+    header, data = readfilbank(filterbank_path)
+
+    # Determine source name
+    if source_name is None:
+        try:
+            source_name = header.basename.split('_')[0]
+        except Exception:
+            source_name = Path(filterbank_path).stem.split('_')[0]
+
+    nchan = header.nchans
+    tsampl = header.tsamp  # seconds
+    freq_start = header.fch1
+    channel_bw = header.foff
+    epoch = header.tstart
+
+    print(f"  Number of channels: {nchan}")
+    print(f"  Sample time: {tsampl} s")
+    print(f"  Start frequency: {freq_start} MHz")
+    print(f"  Channel bandwidth: {channel_bw} MHz")
+    print(f"  Epoch (MJD): {epoch}")
+
+    # Reshape data (nsamp × nchan)
+    print("Loading and reshaping data...")
+    reshaped_data = data.reshape(-1, nchan)
+
+    nsamples = reshaped_data.shape[0]
+    print(f"  Data shape: {reshaped_data.shape} (samples × channels)")
+
+    # Create time and frequency arrays
+    time_samples = np.arange(nsamples) * tsampl
+    freq_channels = freq_start + np.arange(nchan) * channel_bw
+
+    # Visualize the data
+    print("Plotting dynamic spectrum...")
+    show_fig = save_folder is None
+
+    result = visualizeData(
+        source_name=source_name,
+        mjd=epoch,
+        reshaped_data=reshaped_data,
+        time_samples=time_samples,
+        freq_channels=freq_channels,
+        save_folder=save_folder,
+        show_fig=show_fig,
+        p1=p1,
+        p2=p2,
+    )
+
+    if save_folder is None:
+        return result
+
+    # If saved, return the expected filepath
+    folder_path = os.path.join(save_folder, source_name)
+    out_path = os.path.join(folder_path, f"{source_name}_{epoch}_dyn_spec.jpeg")
+    return out_path
+
+
 def main():
     """Main function to plot dynamic spectrum from a filterbank file."""
     parser = argparse.ArgumentParser(
@@ -118,57 +193,20 @@ Example:
     # Validate input file
     if not os.path.exists(args.filterbank):
         parser.error(f"Filterbank file not found: {args.filterbank}")
-    
-    print(f"Reading filterbank file: {args.filterbank}")
-    
-    # Read filterbank file
-    header, data = readfilbank(args.filterbank)
-    
-    # Extract header parameters
-    source_name = header.basename.split('_')[0]
-    nchan = header.nchans
-    tsampl = header.tsamp # s
-    freq_start = header.fch1
-    channel_bw = header.foff
-    epoch = header.tstart
-    
-    print(f"  Number of channels: {nchan}")
-    print(f"  Sample time: {tsampl} s")
-    print(f"  Start frequency: {freq_start} MHz")
-    print(f"  Channel bandwidth: {channel_bw} MHz")
-    print(f"  Epoch (MJD): {epoch}")
-    
-    # Reshape data (nsamp × nchan)
-    print("Loading and reshaping data...")
-    reshaped_data = data.reshape(-1, nchan)
-    
-    nsamples = reshaped_data.shape[0]
-    print(f"  Data shape: {reshaped_data.shape} (samples × channels)")
-    
-    # Create time and frequency arrays
-    time_samples = np.arange(nsamples) * tsampl
-    freq_channels = freq_start + np.arange(nchan) * channel_bw
-    
-    # Visualize the data
-    print("Plotting dynamic spectrum...")
-    show_fig = args.save is None
-    
-    result = visualizeData(
-        source_name=source_name,
-        mjd=epoch,
-        reshaped_data=reshaped_data,
-        time_samples=time_samples,
-        freq_channels=freq_channels,
+
+    # Use reusable function so this module can be imported
+    result = plot_filterbank(
+        filterbank_path=args.filterbank,
         save_folder=args.save,
-        show_fig=show_fig,
         p1=args.p1,
-        p2=args.p2
+        p2=args.p2,
     )
-    
-    if show_fig:
+
+    # If the plot was displayed (result contains figure), show it
+    if args.save is None and result is not None:
         plt.show()
         print("Plot displayed.")
-    else:
+    elif args.save is not None:
         print(f"Plot saved to {args.save}/")
 
 
