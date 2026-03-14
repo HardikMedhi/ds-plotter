@@ -106,8 +106,6 @@ Example:
     
     parser.add_argument('filterbank', type=str,
                        help='Path to the filterbank (.fil) file')
-    parser.add_argument('--source', type=str, default='Unknown Source',
-                       help='Source name (default: Unknown Source)')
     parser.add_argument('--save', type=str, default=None,
                        help='Folder to save the plot (if not provided, plot will be displayed)')
     parser.add_argument('--p1', type=float, default=5,
@@ -127,6 +125,7 @@ Example:
     header, data = readfilbank(args.filterbank)
     
     # Extract header parameters
+    source_name = header.basename.split('_')[0]
     nchan = header.nchans
     tsampl = header.tsamp # s
     freq_start = header.fch1
@@ -155,7 +154,7 @@ Example:
     show_fig = args.save is None
     
     result = visualizeData(
-        source_name=args.source,
+        source_name=source_name,
         mjd=epoch,
         reshaped_data=reshaped_data,
         time_samples=time_samples,
