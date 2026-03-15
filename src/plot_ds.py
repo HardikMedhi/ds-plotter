@@ -163,7 +163,7 @@ def plot_filterbank(filterbank_path, save_folder=None, p1=5, p2=95, source_name=
 
     # If saved, return the expected filepath
     folder_path = os.path.join(save_folder, source_name)
-    out_path = os.path.join(folder_path, f"{source_name}_{epoch}_dyn_spec.jpeg")
+    out_path = os.path.join(folder_path, f"{source_name}_{str(epoch)}_dyn_spec.jpeg")
     return out_path
 
 
