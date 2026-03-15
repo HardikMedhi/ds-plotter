@@ -123,7 +123,10 @@ def plot_filterbank(filterbank_path, save_folder=None, p1=5, p2=95, source_name=
     tsampl = header.tsamp  # seconds
     freq_start = header.fch1
     channel_bw = header.foff
-    epoch = round(header.tstart, 6)
+    epoch = str(round(header.tstart, 6))
+
+    if len(epoch) < 12:
+        epoch += '0' * (12 - len(epoch))
 
     print(f"  Number of channels: {nchan}")
     print(f"  Sample time: {tsampl} s")
@@ -163,7 +166,7 @@ def plot_filterbank(filterbank_path, save_folder=None, p1=5, p2=95, source_name=
 
     # If saved, return the expected filepath
     folder_path = os.path.join(save_folder, source_name)
-    out_path = os.path.join(folder_path, f"{source_name}_{str(epoch)}_dyn_spec.jpeg")
+    out_path = os.path.join(folder_path, f"{source_name}_{epoch}_dyn_spec.jpeg")
     return out_path
 
 
