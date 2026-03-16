@@ -51,6 +51,8 @@ python src/plot_ds.py /path/to/PSR_B1133+16_59500.fil
 python src/plot_ds.py /path/to/PSR_B1133+16_59500.fil --f1 80 --f2 100
 ```
 
+**Note:** Due to negative channel bandwidth in the ORT data format, `f1` (start frequency) will always be **higher** than `f2` (end frequency). For example, `--f1 326.2 --f2 325.8` selects frequencies between 325.8 and 326.2 MHz.
+
 #### Save to Directory
 
 ```bash
@@ -97,8 +99,8 @@ plot_filterbank(filterbank_path, save_folder=None, f1=None, f2=None, source_name
 **Parameters:**
 - `filterbank_path` (str): Path to the filterbank (.fil) file
 - `save_folder` (str or None, default=None): Folder to save the plot. If None, returns figure object
-- `f1` (float or None, default=None): Start frequency in MHz. If None, uses filterbank start frequency. If outside file's bandwidth, clamped to nearest available frequency
-- `f2` (float or None, default=None): End frequency in MHz. If None, uses filterbank end frequency. If outside file's bandwidth, clamped to nearest available frequency
+- `f1` (float or None, default=None): Start frequency in MHz (typically higher than f2 due to negative channel bandwidth). If None, uses filterbank start frequency. If outside file's bandwidth, clamped to nearest available frequency
+- `f2` (float or None, default=None): End frequency in MHz (typically lower than f1 due to negative channel bandwidth). If None, uses filterbank end frequency. If outside file's bandwidth, clamped to nearest available frequency
 - `source_name` (str or None, default=None): Override source name; if None, extracts from filename
 
 **Returns:**
@@ -137,6 +139,7 @@ When saving, files are organized in a source-specific subfolder: `{save_folder}/
 
 ## Notes
 
+- **ORT Data Origin**: This code was built specifically for data from the Ooty Radio Telescope (ORT), which handles frequency inversions via negative channel bandwidth. The frequency parameter ordering (f1 > f2) reflects this characteristic
 - The script uses UTC+5:30 timezone conversion for datetime display (suitable for Indian Standard Time)
 - Data is automatically reshaped to (samples × channels) format
 - All frequency values are in MHz; all time values are in seconds
