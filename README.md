@@ -42,13 +42,13 @@ The source name is automatically extracted from the filename (the part before th
 #### Basic Usage (Full Frequency Range)
 
 ```bash
-python src/plot_ds.py /path/to/PSR_B1133+16_59500.fil
+python plot_ds.py /path/to/PSR_B1133+16_59500.fil
 ```
 
 #### Specify Frequency Range
 
 ```bash
-python src/plot_ds.py /path/to/PSR_B1133+16_59500.fil --f1 100 --f2 80
+python plot_ds.py /path/to/PSR_B1133+16_59500.fil --f1 100 --f2 80
 ```
 
 **Note:** Due to negative channel bandwidth in the ORT data format, `f1` (start frequency) will always be **higher** than `f2` (end frequency). For example, `--f1 326.2 --f2 325.8` selects frequencies between 325.8 and 326.2 MHz.
@@ -56,13 +56,13 @@ python src/plot_ds.py /path/to/PSR_B1133+16_59500.fil --f1 100 --f2 80
 #### Save to Directory
 
 ```bash
-python src/plot_ds.py /path/to/PSR_B1133+16_59500.fil --save output_plots/
+python plot_ds.py /path/to/PSR_B1133+16_59500.fil --save output_plots/
 ```
 
 #### Full Example with Frequency Range
 
 ```bash
-python src/plot_ds.py data/PSR_B1133+16_59500.fil --f1 250 --f2 150 --save ./results/
+python plot_ds.py data/PSR_B1133+16_59500.fil --f1 250 --f2 150 --save ./results/
 ```
 
 ### Programmatic Usage (Import)
@@ -70,7 +70,7 @@ python src/plot_ds.py data/PSR_B1133+16_59500.fil --f1 250 --f2 150 --save ./res
 You can also import `plot_filterbank()` to use this module in other projects:
 
 ```python
-from filterbank_plotter.src.plot_ds import plot_filterbank
+from filterbank_plotter.plot_ds import plot_filterbank
 
 # Display plot interactively (full frequency range)
 fig, ax_main = plot_filterbank('/path/to/PSR_B1133+16_59500.fil')
