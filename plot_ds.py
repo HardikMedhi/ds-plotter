@@ -10,7 +10,19 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from astropy.time import Time, TimezoneInfo
 import astropy.units as u
+from astropy.io import fits
 import your
+
+def get_file_type(file_path):
+    """Determine if file is FITS or filterbank format."""
+    file_ext = Path(file_path).suffix.lower()
+    if file_ext in ['.fits', '.fit']:
+        return 'fits'
+    elif file_ext == '.fil':
+        return 'filterbank'
+    else:
+        raise ValueError(f"Unsupported file format: {file_ext}. Expected .fits, .fit, or .fil")
+
 
 def readfilbank(fb_path):
     fb_obj = your.Your(fb_path)
@@ -19,6 +31,48 @@ def readfilbank(fb_path):
     nsamp = header.nspectra
     data = fb_obj.get_data(nstart=0, nsamp=nsamp)
 
+    return header, data
+
+
+def readfits(fits_path):
+    """Read a FITS file containing dynamic spectrum data.
+    
+    Returns a header-like object and data array compatible with the rest of the pipeline.
+    """
+    with fits.open(fits_path) as hdul:
+        # Get the primary header and data
+        header_dict = dict(hdul[0].header)
+        data = hdul[0].data
+        
+        if data is None and len(hdul) > 1:
+            # Try binary table HDU if primary is empty
+            data = hdul[1].data
+            header_dict = dict(hdul[1].header)
+    
+    # Create a simple header-like object to match your.Your interface
+    class FitsHeader:
+        pass
+    
+    header = FitsHeader()
+    
+    # Extract or deduce necessary parameters from FITS header
+    # Common FITS keywords for dynamic spectra
+    header.nchans = header_dict.get('NAXIS1', header_dict.get('NCHAN', data.shape[-1] if data is not None else 1))
+    header.tsamp = header_dict.get('TSAMP', header_dict.get('CDELT2', 1.0))
+    header.fch1 = header_dict.get('FCH1', header_dict.get('CRVAL1', 0.0))
+    header.foff = header_dict.get('FOFF', header_dict.get('CDELT1', 1.0))
+    header.tstart = header_dict.get('TSTART', header_dict.get('MJD-OBS', 0.0))
+    header.basename = header_dict.get('BASENAME', Path(fits_path).stem)
+    
+    # Handle data shape - ensure it's 1D or 2D
+    if data.ndim > 2:
+        # Flatten to 1D if necessary
+        data = data.flatten()
+    elif data.ndim == 2:
+        # Already in (time, freq) or (freq, time) format
+        # Assume FITS convention: last axis is frequency
+        pass
+    
     return header, data
 
 
@@ -81,11 +135,46 @@ def visualizeData(source_name, mjd, reshaped_data, time_samples, freq_channels, 
     if save_folder is not None:
         folder_path = '/'.join([save_folder, source_name])
         os.makedirs(folder_path, exist_ok=True)
-        fig.savefig(f"{folder_path}/{source_name}_{mjd}_{f1:.2f}_{f2:.2f}_dyn_spec.jpeg", bbox_inches='tight', dpi=150)
+        
+        # Construct the filename
+        filename = f"{source_name}_{mjd}_{f1:.2f}_{f2:.2f}_dyn_spec.jpeg"
+        filepath = os.path.join(folder_path, filename)
+        
+        # Check if file exists and handle user input
+        filepath = handle_file_existence(filepath)
+        
+        fig.savefig(filepath, bbox_inches='tight', dpi=150)
         plt.close(fig)
         return None
     
     return fig, ax_main
+
+def handle_file_existence(filepath):
+    """Check if file exists and prompt user for alternative action.
+    
+    If file exists, asks user whether to append a word to the filename.
+    If user provides a word, appends it with underscore before the file extension.
+    If user declines or provides empty input, returns original filepath (will overwrite).
+    
+    Parameters:
+    - filepath: str - the intended filepath
+    
+    Returns:
+    - str - the final filepath to use (either modified or original)
+    """
+    if os.path.exists(filepath):
+        print(f"File already exists: {filepath}")
+        user_input = input("Do you want to append a word to the filename? (yes/no): ").strip().lower()
+        
+        if user_input in ['yes', 'y']:
+            additional_word = input("Enter the word to append: ").strip()
+            if additional_word:
+                # Insert the additional word before the file extension
+                name_parts = filepath.rsplit('.jpeg', 1)
+                filepath = f"{name_parts[0]}_{additional_word}.jpeg"
+    
+    return filepath
+
 
 def mjdToDateTime(mjd):
     """Converts MJD to a datetime object."""
@@ -93,32 +182,38 @@ def mjdToDateTime(mjd):
     return t.to_datetime(timezone=TimezoneInfo(utc_offset=5.5*u.hour))
 
 
-def plot_filterbank(filterbank_path, save_folder=None, f1=None, f2=None, source_name=None):
-    """Read a filterbank file and produce (or save) the dynamic spectrum plot.
+def plot_dynspec(file_path, save_folder=None, f1=None, f2=None, source_name=None):
+    """Read a filterbank or FITS file and produce (or save) the dynamic spectrum plot.
 
     Parameters:
-    - filterbank_path: str - path to the .fil file
+    - file_path: str - path to the .fil or .fits file
     - save_folder: str or None - if provided, save the plot to this folder
-    - f1: float or None - start frequency in MHz; if None, uses filterbank start frequency
-    - f2: float or None - end frequency in MHz; if None, uses filterbank end frequency
+    - f1: float or None - start frequency in MHz; if None, uses file start frequency
+    - f2: float or None - end frequency in MHz; if None, uses file end frequency
     - source_name: optional override for the source name used in the plot title
 
     Returns:
     - If `save_folder` is None: returns (fig, ax_main)
     - If `save_folder` is provided: returns the output filepath string
     """
-    if not os.path.exists(filterbank_path):
-        raise FileNotFoundError(f"Filterbank file not found: {filterbank_path}")
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"File not found: {file_path}")
 
-    print(f"Reading filterbank file: {filterbank_path}")
-    header, data = readfilbank(filterbank_path)
+    # Detect file type and read accordingly
+    file_type = get_file_type(file_path)
+    print(f"Reading {file_type} file: {file_path}")
+    
+    if file_type == 'fits':
+        header, data = readfits(file_path)
+    else:
+        header, data = readfilbank(file_path)
 
     # Determine source name
     if source_name is None:
         try:
             source_name = header.basename.split('_')[0]
         except Exception:
-            source_name = Path(filterbank_path).stem.split('_')[0]
+            source_name = Path(file_path).stem.split('_')[0]
 
     nchan = header.nchans
     tsampl = header.tsamp  # seconds
@@ -197,19 +292,20 @@ def plot_filterbank(filterbank_path, save_folder=None, f1=None, f2=None, source_
 
 
 def main():
-    """Main function to plot dynamic spectrum from a filterbank file."""
+    """Main function to plot dynamic spectrum from a filterbank or FITS file."""
     parser = argparse.ArgumentParser(
-        description='Plot dynamic spectrum from a filterbank file.',
+        description='Plot dynamic spectrum from a filterbank (.fil) or FITS file.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Example:
   python plot_ds.py /path/to/data.fil
+  python plot_ds.py /path/to/data.fits
   python plot_ds.py /path/to/data.fil --save output_plots/
         """
     )
     
     parser.add_argument('filterbank', type=str,
-                       help='Path to the filterbank (.fil) file')
+                       help='Path to the filterbank (.fil) or FITS (.fits) file')
     parser.add_argument('--save', type=str, default=None,
                        help='Folder to save the plot (if not provided, plot will be displayed)')
     parser.add_argument('--f1', type=float, default=None,
@@ -224,8 +320,8 @@ Example:
         parser.error(f"Filterbank file not found: {args.filterbank}")
 
     # Use reusable function so this module can be imported
-    result = plot_filterbank(
-        filterbank_path=args.filterbank,
+    result = plot_dynspec(
+        file_path=args.filterbank,
         save_folder=args.save,
         f1=args.f1,
         f2=args.f2,
